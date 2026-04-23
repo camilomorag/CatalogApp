@@ -9,7 +9,6 @@ import com.example.catalogapp.data.network.RetrofitClient
 import com.example.catalogapp.data.repository.ProductRepository
 import com.example.catalogapp.model.CartProduct
 import com.example.catalogapp.model.CartRequest
-import com.example.catalogapp.model.CartResponse
 import com.example.catalogapp.model.Product
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -26,9 +25,6 @@ class CatalogViewModel : ViewModel() {
     var cart by mutableStateOf<List<Product>>(emptyList())
         private set
 
-    var cartsFromApi by mutableStateOf<List<CartResponse>>(emptyList())
-        private set
-
     var isLoading by mutableStateOf(false)
         private set
 
@@ -38,25 +34,151 @@ class CatalogViewModel : ViewModel() {
     var successMessage by mutableStateOf<String?>(null)
         private set
 
-    var lastRequest by mutableStateOf("")
-        private set
-
-    var lastResponse by mutableStateOf("")
+    var apiLogs by mutableStateOf<List<String>>(emptyList())
         private set
 
     init {
         loadProducts()
     }
 
+    private fun addApiLog(title: String, request: String, response: String) {
+        val log = """
+$title
+
+REQUEST:
+$request
+
+RESPONSE:
+$response
+        """.trimIndent()
+
+        apiLogs = listOf(log) + apiLogs
+    }
+
+    fun clearMessages() {
+        errorMessage = null
+        successMessage = null
+    }
+
     fun loadProducts() {
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
+
             try {
-                products = repository.fetchAllProducts()
+                val result = repository.fetchAllProducts()
+                products = result
+
+                addApiLog(
+                    title = "GET /products",
+                    request = "GET https://fakestoreapi.com/products",
+                    response = "Productos obtenidos: ${result.size}"
+                )
             } catch (e: Exception) {
                 e.printStackTrace()
                 errorMessage = "No se pudieron cargar los productos: ${e.localizedMessage}"
+
+                addApiLog(
+                    title = "GET /products",
+                    request = "GET https://fakestoreapi.com/products",
+                    response = "ERROR: ${e.localizedMessage}"
+                )
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun addProduct(product: Product) {
+        viewModelScope.launch {
+            isLoading = true
+            errorMessage = null
+            successMessage = null
+
+            try {
+                val created = repository.createProduct(product)
+                products = listOf(created) + products
+                successMessage = "Producto agregado correctamente"
+
+                addApiLog(
+                    title = "POST /products",
+                    request = "POST https://fakestoreapi.com/products\nBody: $product",
+                    response = created.toString()
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                errorMessage = "Error al agregar producto: ${e.localizedMessage}"
+
+                addApiLog(
+                    title = "POST /products",
+                    request = "POST https://fakestoreapi.com/products\nBody: $product",
+                    response = "ERROR: ${e.localizedMessage}"
+                )
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun updateProduct(product: Product) {
+        viewModelScope.launch {
+            isLoading = true
+            errorMessage = null
+            successMessage = null
+
+            try {
+                val updated = repository.updateProduct(product.id, product)
+                products = products.map {
+                    if (it.id == product.id) updated else it
+                }
+                successMessage = "Producto editado correctamente"
+
+                addApiLog(
+                    title = "PUT /products/${product.id}",
+                    request = "PUT https://fakestoreapi.com/products/${product.id}\nBody: $product",
+                    response = updated.toString()
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                errorMessage = "Error al editar producto: ${e.localizedMessage}"
+
+                addApiLog(
+                    title = "PUT /products/${product.id}",
+                    request = "PUT https://fakestoreapi.com/products/${product.id}\nBody: $product",
+                    response = "ERROR: ${e.localizedMessage}"
+                )
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun deleteProduct(productId: Int) {
+        viewModelScope.launch {
+            isLoading = true
+            errorMessage = null
+            successMessage = null
+
+            try {
+                val deleted = repository.deleteProduct(productId)
+                products = products.filterNot { it.id == productId }
+                cart = cart.filterNot { it.id == productId }
+                successMessage = "Producto eliminado correctamente"
+
+                addApiLog(
+                    title = "DELETE /products/$productId",
+                    request = "DELETE https://fakestoreapi.com/products/$productId",
+                    response = deleted.toString()
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                errorMessage = "Error al eliminar producto: ${e.localizedMessage}"
+
+                addApiLog(
+                    title = "DELETE /products/$productId",
+                    request = "DELETE https://fakestoreapi.com/products/$productId",
+                    response = "ERROR: ${e.localizedMessage}"
+                )
             } finally {
                 isLoading = false
             }
@@ -82,11 +204,6 @@ class CatalogViewModel : ViewModel() {
 
     fun clearCart() {
         cart = emptyList()
-    }
-
-    fun clearMessages() {
-        errorMessage = null
-        successMessage = null
     }
 
     fun sendCartToApi(userId: Int = 1) {
@@ -117,48 +234,30 @@ class CatalogViewModel : ViewModel() {
                     products = groupedProducts
                 )
 
-                lastRequest = """
-POST /carts
-
-Body:
-$request
-            """.trimIndent()
-
                 val response = repository.createCart(request)
 
                 println("RESPUESTA API: $response")
 
-                lastResponse = """
-Response:
-$response
-            """.trimIndent()
+                addApiLog(
+                    title = "POST /carts",
+                    request = "POST https://fakestoreapi.com/carts\nBody: $request",
+                    response = response.toString()
+                )
 
                 successMessage = "Compra enviada correctamente. ID carrito: ${response.id}"
                 clearCart()
-
             } catch (e: Exception) {
                 e.printStackTrace()
                 errorMessage = "Error al enviar carrito: ${e.localizedMessage}"
-                lastResponse = "Error: ${e.localizedMessage}"
+
+                addApiLog(
+                    title = "POST /carts",
+                    request = "POST https://fakestoreapi.com/carts",
+                    response = "ERROR: ${e.localizedMessage}"
+                )
             } finally {
                 isLoading = false
             }
         }
     }
-
-    fun loadCartsFromApi() {
-        viewModelScope.launch {
-            isLoading = true
-            errorMessage = null
-            try {
-                cartsFromApi = repository.getCarts()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                errorMessage = "Error al obtener carritos: ${e.localizedMessage}"
-            } finally {
-                isLoading = false
-            }
-        }
-    }
-
 }

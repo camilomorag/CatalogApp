@@ -13,8 +13,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -24,9 +24,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -62,26 +64,25 @@ fun CatalogScreen(
     val isLoading = viewModel.isLoading
     val errorMessage = viewModel.errorMessage
     val successMessage = viewModel.successMessage
-    val lastRequest = viewModel.lastRequest
-    val lastResponse = viewModel.lastResponse
+    val apiLogs = viewModel.apiLogs
 
     var showCartDialog by remember { mutableStateOf(false) }
+    var showApiDialog by remember { mutableStateOf(false) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var selectedProduct by remember { mutableStateOf<Product?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(errorMessage, successMessage) {
         errorMessage?.let { message ->
-            scope.launch {
-                snackbarHostState.showSnackbar(message)
-            }
+            scope.launch { snackbarHostState.showSnackbar(message) }
             viewModel.clearMessages()
         }
 
         successMessage?.let { message ->
-            scope.launch {
-                snackbarHostState.showSnackbar(message)
-            }
+            scope.launch { snackbarHostState.showSnackbar(message) }
             viewModel.clearMessages()
         }
     }
@@ -92,6 +93,10 @@ fun CatalogScreen(
             TopAppBar(
                 title = { Text("Catálogo de Productos") },
                 actions = {
+                    TextButton(onClick = { showApiDialog = true }) {
+                        Text("API")
+                    }
+
                     IconButton(onClick = { showCartDialog = true }) {
                         BadgedBox(
                             badge = {
@@ -110,6 +115,11 @@ fun CatalogScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showAddDialog = true }) {
+                Text("+")
+            }
         }
     ) { paddingValues ->
 
@@ -140,10 +150,7 @@ fun CatalogScreen(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Button(
-                            onClick = {
-                                viewModel.clearMessages()
-                                viewModel.loadProducts()
-                            }
+                            onClick = { viewModel.loadProducts() }
                         ) {
                             Text("Reintentar")
                         }
@@ -157,21 +164,18 @@ fun CatalogScreen(
                             .padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-
                         items(products) { product ->
                             ProductCard(
                                 product = product,
-                                onAddToCart = { viewModel.addToCart(product) }
+                                onAddToCart = { viewModel.addToCart(product) },
+                                onEdit = {
+                                    selectedProduct = product
+                                    showEditDialog = true
+                                },
+                                onDelete = {
+                                    viewModel.deleteProduct(product.id)
+                                }
                             )
-                        }
-
-                        if (lastRequest.isNotBlank() || lastResponse.isNotBlank()) {
-                            item {
-                                ApiDemoCard(
-                                    lastRequest = lastRequest,
-                                    lastResponse = lastResponse
-                                )
-                            }
                         }
                     }
                 }
@@ -185,14 +189,43 @@ fun CatalogScreen(
             total = viewModel.cartTotal(),
             isLoading = isLoading,
             onDismiss = { showCartDialog = false },
-            onRemoveItem = { product ->
-                viewModel.removeFromCart(product)
+            onRemoveItem = { product -> viewModel.removeFromCart(product) },
+            onClearCart = { viewModel.clearCart() },
+            onBuy = { viewModel.sendCartToApi(userId = 1) }
+        )
+    }
+
+    if (showApiDialog) {
+        ApiLogsDialog(
+            logs = apiLogs,
+            onDismiss = { showApiDialog = false }
+        )
+    }
+
+    if (showAddDialog) {
+        ProductFormDialog(
+            title = "Agregar producto",
+            initialProduct = null,
+            onDismiss = { showAddDialog = false },
+            onSave = { product ->
+                viewModel.addProduct(product)
+                showAddDialog = false
+            }
+        )
+    }
+
+    if (showEditDialog && selectedProduct != null) {
+        ProductFormDialog(
+            title = "Editar producto",
+            initialProduct = selectedProduct,
+            onDismiss = {
+                showEditDialog = false
+                selectedProduct = null
             },
-            onClearCart = {
-                viewModel.clearCart()
-            },
-            onBuy = {
-                viewModel.sendCartToApi(userId = 1)
+            onSave = { product ->
+                viewModel.updateProduct(product)
+                showEditDialog = false
+                selectedProduct = null
             }
         )
     }
@@ -201,7 +234,9 @@ fun CatalogScreen(
 @Composable
 fun ProductCard(
     product: Product,
-    onAddToCart: () -> Unit
+    onAddToCart: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -258,64 +293,162 @@ fun ProductCard(
                 onClick = onAddToCart,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(
-                    imageVector = Icons.Default.AddShoppingCart,
-                    contentDescription = "Agregar al carrito"
-                )
-                Text(" Agregar al carrito")
+                Text("Agregar al carrito")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Button(onClick = onEdit) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Editar"
+                    )
+                    Text(" Editar")
+                }
+
+                Button(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Eliminar"
+                    )
+                    Text(" Eliminar")
+                }
             }
         }
     }
 }
 
 @Composable
-fun ApiDemoCard(
-    lastRequest: String,
-    lastResponse: String
+fun ProductFormDialog(
+    title: String,
+    initialProduct: Product?,
+    onDismiss: () -> Unit,
+    onSave: (Product) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = "Prueba de API (tipo Swagger)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+    var productTitle by remember { mutableStateOf(initialProduct?.title ?: "") }
+    var productPrice by remember { mutableStateOf(initialProduct?.price?.toString() ?: "") }
+    var productDescription by remember { mutableStateOf(initialProduct?.description ?: "") }
+    var productCategory by remember { mutableStateOf(initialProduct?.category ?: "") }
+    var productImage by remember { mutableStateOf(initialProduct?.image ?: "") }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (lastRequest.isNotBlank()) {
-                Text(
-                    text = "REQUEST:",
-                    fontWeight = FontWeight.Bold
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = productTitle,
+                    onValueChange = { productTitle = it },
+                    label = { Text("Título") },
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = lastRequest,
-                    style = MaterialTheme.typography.bodySmall
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = productPrice,
+                    onValueChange = { productPrice = it },
+                    label = { Text("Precio") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = productDescription,
+                    onValueChange = { productDescription = it },
+                    label = { Text("Descripción") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = productCategory,
+                    onValueChange = { productCategory = it },
+                    label = { Text("Categoría") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = productImage,
+                    onValueChange = { productImage = it },
+                    label = { Text("URL imagen") },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (lastResponse.isNotBlank()) {
-                Text(
-                    text = "RESPONSE:",
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = lastResponse,
-                    style = MaterialTheme.typography.bodySmall
-                )
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val product = Product(
+                        id = initialProduct?.id ?: 0,
+                        title = productTitle,
+                        price = productPrice.toDoubleOrNull() ?: 0.0,
+                        description = productDescription,
+                        category = productCategory,
+                        image = productImage,
+                        rating = initialProduct?.rating
+                    )
+                    onSave(product)
+                }
+            ) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
             }
         }
-    }
+    )
+}
+
+@Composable
+fun ApiLogsDialog(
+    logs: List<String>,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Peticiones API") },
+        text = {
+            if (logs.isEmpty()) {
+                Text("Aún no hay peticiones registradas")
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(320.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(logs) { log ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = log,
+                                modifier = Modifier.padding(12.dp),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cerrar")
+            }
+        }
+    )
 }
 
 @Composable
@@ -354,9 +487,7 @@ fun CartDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(
-                                        modifier = Modifier.weight(1f)
-                                    ) {
+                                    Column {
                                         Text(
                                             text = product.title,
                                             fontWeight = FontWeight.Bold
