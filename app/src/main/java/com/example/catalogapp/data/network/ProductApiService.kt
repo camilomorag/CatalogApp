@@ -1,5 +1,7 @@
 package com.example.catalogapp.data.network
 
+import com.example.catalogapp.model.CartRequest
+import com.example.catalogapp.model.CartResponse
 import com.example.catalogapp.model.Product
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -24,4 +26,10 @@ interface ProductApiService {
 
     @DELETE("products/{id}")
     suspend fun deleteProduct(@Path("id") id: Int): Product
+
+    @POST("carts")
+    suspend fun createCart(@Body cart: CartRequest): CartResponse
+
+    @GET("carts")
+    suspend fun getCarts(): List<CartResponse>
 }

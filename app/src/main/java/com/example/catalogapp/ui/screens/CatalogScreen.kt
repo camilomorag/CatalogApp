@@ -28,13 +28,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +50,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.catalogapp.model.Product
 import com.example.catalogapp.ui.viewmodel.CatalogViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,10 +61,33 @@ fun CatalogScreen(
     val cart = viewModel.cart
     val isLoading = viewModel.isLoading
     val errorMessage = viewModel.errorMessage
+    val successMessage = viewModel.successMessage
+    val lastRequest = viewModel.lastRequest
+    val lastResponse = viewModel.lastResponse
 
     var showCartDialog by remember { mutableStateOf(false) }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(errorMessage, successMessage) {
+        errorMessage?.let { message ->
+            scope.launch {
+                snackbarHostState.showSnackbar(message)
+            }
+            viewModel.clearMessages()
+        }
+
+        successMessage?.let { message ->
+            scope.launch {
+                snackbarHostState.showSnackbar(message)
+            }
+            viewModel.clearMessages()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Catálogo de Productos") },
@@ -91,13 +119,13 @@ fun CatalogScreen(
                 .padding(paddingValues)
         ) {
             when {
-                isLoading -> {
+                isLoading && products.isEmpty() -> {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
 
-                errorMessage != null -> {
+                errorMessage != null && products.isEmpty() -> {
                     Column(
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -111,10 +139,12 @@ fun CatalogScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        Button(onClick = {
-                            viewModel.clearError()
-                            viewModel.loadProducts()
-                        }) {
+                        Button(
+                            onClick = {
+                                viewModel.clearMessages()
+                                viewModel.loadProducts()
+                            }
+                        ) {
                             Text("Reintentar")
                         }
                     }
@@ -127,13 +157,21 @@ fun CatalogScreen(
                             .padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+
                         items(products) { product ->
                             ProductCard(
                                 product = product,
-                                onAddToCart = {
-                                    viewModel.addToCart(product)
-                                }
+                                onAddToCart = { viewModel.addToCart(product) }
                             )
+                        }
+
+                        if (lastRequest.isNotBlank() || lastResponse.isNotBlank()) {
+                            item {
+                                ApiDemoCard(
+                                    lastRequest = lastRequest,
+                                    lastResponse = lastResponse
+                                )
+                            }
                         }
                     }
                 }
@@ -145,12 +183,16 @@ fun CatalogScreen(
         CartDialog(
             cartItems = cart,
             total = viewModel.cartTotal(),
+            isLoading = isLoading,
             onDismiss = { showCartDialog = false },
             onRemoveItem = { product ->
                 viewModel.removeFromCart(product)
             },
             onClearCart = {
                 viewModel.clearCart()
+            },
+            onBuy = {
+                viewModel.sendCartToApi(userId = 1)
             }
         )
     }
@@ -166,8 +208,9 @@ fun ProductCard(
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
             AsyncImage(
                 model = product.image,
                 contentDescription = product.title,
@@ -219,8 +262,57 @@ fun ProductCard(
                     imageVector = Icons.Default.AddShoppingCart,
                     contentDescription = "Agregar al carrito"
                 )
+                Text(" Agregar al carrito")
+            }
+        }
+    }
+}
+
+@Composable
+fun ApiDemoCard(
+    lastRequest: String,
+    lastResponse: String
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Prueba de API (tipo Swagger)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (lastRequest.isNotBlank()) {
+                Text(
+                    text = "REQUEST:",
+                    fontWeight = FontWeight.Bold
+                )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("Agregar al carrito")
+                Text(
+                    text = lastRequest,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (lastResponse.isNotBlank()) {
+                Text(
+                    text = "RESPONSE:",
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = lastResponse,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }
@@ -230,9 +322,11 @@ fun ProductCard(
 fun CartDialog(
     cartItems: List<Product>,
     total: Double,
+    isLoading: Boolean,
     onDismiss: () -> Unit,
     onRemoveItem: (Product) -> Unit,
-    onClearCart: () -> Unit
+    onClearCart: () -> Unit,
+    onBuy: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -260,7 +354,9 @@ fun CartDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
                                         Text(
                                             text = product.title,
                                             fontWeight = FontWeight.Bold
@@ -268,7 +364,9 @@ fun CartDialog(
                                         Text(text = "$ ${product.price}")
                                     }
 
-                                    IconButton(onClick = { onRemoveItem(product) }) {
+                                    IconButton(
+                                        onClick = { onRemoveItem(product) }
+                                    ) {
                                         Icon(
                                             imageVector = Icons.Default.Delete,
                                             contentDescription = "Eliminar del carrito"
@@ -290,9 +388,20 @@ fun CartDialog(
             }
         },
         confirmButton = {
-            if (cartItems.isNotEmpty()) {
-                Button(onClick = onClearCart) {
-                    Text("Vaciar carrito")
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (cartItems.isNotEmpty()) {
+                    Button(onClick = onClearCart) {
+                        Text("Vaciar")
+                    }
+
+                    Button(
+                        onClick = onBuy,
+                        enabled = !isLoading
+                    ) {
+                        Text("Comprar")
+                    }
                 }
             }
         },
