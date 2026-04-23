@@ -1,5 +1,6 @@
 package com.example.catalogapp.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,32 +10,43 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -91,10 +104,27 @@ fun CatalogScreen(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Catálogo de Productos") },
+                title = {
+                    Column {
+                        Text(
+                            text = "CatalogApp",
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Productos y compras",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
                 actions = {
-                    TextButton(onClick = { showApiDialog = true }) {
-                        Text("API")
+                    IconButton(onClick = { showApiDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Ver peticiones API"
+                        )
                     }
 
                     IconButton(onClick = { showCartDialog = true }) {
@@ -117,8 +147,14 @@ fun CatalogScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Text("+")
+            FloatingActionButton(
+                onClick = { showAddDialog = true },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Agregar producto"
+                )
             }
         }
     ) { paddingValues ->
@@ -127,6 +163,7 @@ fun CatalogScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             when {
                 isLoading && products.isEmpty() -> {
@@ -136,34 +173,27 @@ fun CatalogScreen(
                 }
 
                 errorMessage != null && products.isEmpty() -> {
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = errorMessage,
-                            color = MaterialTheme.colorScheme.error
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Button(
-                            onClick = { viewModel.loadProducts() }
-                        ) {
-                            Text("Reintentar")
-                        }
-                    }
+                    EmptyState(
+                        message = errorMessage,
+                        buttonText = "Reintentar",
+                        onClick = { viewModel.loadProducts() }
+                    )
                 }
 
                 else -> {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
+                        item {
+                            HeaderSummary(
+                                totalProducts = products.size,
+                                totalCart = viewModel.cartCount()
+                            )
+                        }
+
                         items(products) { product ->
                             ProductCard(
                                 product = product,
@@ -232,6 +262,72 @@ fun CatalogScreen(
 }
 
 @Composable
+fun HeaderSummary(
+    totalProducts: Int,
+    totalCart: Int
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp)
+        ) {
+            Text(
+                text = "Bienvenido",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "Explora el catálogo y administra compras de forma sencilla.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                StatChip("Productos", totalProducts.toString())
+                StatChip("Carrito", totalCart.toString())
+            }
+        }
+    }
+}
+
+@Composable
+fun StatChip(
+    label: String,
+    value: String
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Text(
+                text = value,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+@Composable
 fun ProductCard(
     product: Product,
     onAddToCart: () -> Unit,
@@ -240,82 +336,119 @@ fun ProductCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            AsyncImage(
-                model = product.image,
-                contentDescription = product.title,
+        Column {
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
-                    .clip(RoundedCornerShape(12.dp)),
-                contentScale = ContentScale.Fit
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = product.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "$ ${product.price}",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = product.description,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 3
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "Categoría: ${product.category ?: "Sin categoría"}",
-                style = MaterialTheme.typography.bodySmall
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Button(
-                onClick = onAddToCart,
-                modifier = Modifier.fillMaxWidth()
+                    .height(230.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Text("Agregar al carrito")
+                AsyncImage(
+                    model = product.image,
+                    contentDescription = product.title,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                        .clip(RoundedCornerShape(18.dp)),
+                    contentScale = ContentScale.Fit
+                )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+            Column(
+                modifier = Modifier.padding(16.dp)
             ) {
-                Button(onClick = onEdit) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Editar"
+                Text(
+                    text = product.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "$ ${product.price}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = product.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(
+                        text = "Categoría: ${product.category ?: "Sin categoría"}",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium
                     )
-                    Text(" Editar")
                 }
 
-                Button(onClick = onDelete) {
+                Spacer(modifier = Modifier.height(14.dp))
+
+                ElevatedButton(
+                    onClick = onAddToCart,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ShoppingCart,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Agregar al carrito")
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedButton(
+                    onClick = onEdit,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Editar")
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Button(
+                    onClick = onDelete,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Eliminar"
+                        contentDescription = null
                     )
-                    Text(" Eliminar")
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Eliminar")
                 }
             }
         }
@@ -337,50 +470,54 @@ fun ProductFormDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
+        title = {
+            Text(
+                text = title,
+                fontWeight = FontWeight.Bold
+            )
+        },
         text = {
-            Column {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 OutlinedTextField(
                     value = productTitle,
                     onValueChange = { productTitle = it },
                     label = { Text("Título") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
 
                 OutlinedTextField(
                     value = productPrice,
                     onValueChange = { productPrice = it },
                     label = { Text("Precio") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
 
                 OutlinedTextField(
                     value = productDescription,
                     onValueChange = { productDescription = it },
                     label = { Text("Descripción") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
 
                 OutlinedTextField(
                     value = productCategory,
                     onValueChange = { productCategory = it },
                     label = { Text("Categoría") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
 
                 OutlinedTextField(
                     value = productImage,
                     onValueChange = { productImage = it },
                     label = { Text("URL imagen") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
                 )
             }
         },
@@ -397,7 +534,8 @@ fun ProductFormDialog(
                         rating = initialProduct?.rating
                     )
                     onSave(product)
-                }
+                },
+                shape = RoundedCornerShape(14.dp)
             ) {
                 Text("Guardar")
             }
@@ -417,7 +555,12 @@ fun ApiLogsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Peticiones API") },
+        title = {
+            Text(
+                text = "Peticiones API",
+                fontWeight = FontWeight.Bold
+            )
+        },
         text = {
             if (logs.isEmpty()) {
                 Text("Aún no hay peticiones registradas")
@@ -426,16 +569,19 @@ fun ApiLogsDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(320.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(logs) { log ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
                         ) {
                             Text(
                                 text = log,
-                                modifier = Modifier.padding(12.dp),
+                                modifier = Modifier.padding(14.dp),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -463,7 +609,12 @@ fun CartDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Carrito de compras") },
+        title = {
+            Text(
+                text = "Carrito de compras",
+                fontWeight = FontWeight.Bold
+            )
+        },
         text = {
             Column {
                 if (cartItems.isEmpty()) {
@@ -472,13 +623,16 @@ fun CartDialog(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(300.dp),
+                            .height(280.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(cartItems) { product ->
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -490,14 +644,15 @@ fun CartDialog(
                                     Column {
                                         Text(
                                             text = product.title,
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
+                                        Spacer(modifier = Modifier.height(4.dp))
                                         Text(text = "$ ${product.price}")
                                     }
 
-                                    IconButton(
-                                        onClick = { onRemoveItem(product) }
-                                    ) {
+                                    IconButton(onClick = { onRemoveItem(product) }) {
                                         Icon(
                                             imageVector = Icons.Default.Delete,
                                             contentDescription = "Eliminar del carrito"
@@ -508,13 +663,20 @@ fun CartDialog(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    Text(
-                        text = "Total: $ $total",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = "Total: $ $total",
+                            modifier = Modifier.padding(14.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         },
@@ -523,13 +685,17 @@ fun CartDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (cartItems.isNotEmpty()) {
-                    Button(onClick = onClearCart) {
+                    OutlinedButton(
+                        onClick = onClearCart,
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
                         Text("Vaciar")
                     }
 
                     Button(
                         onClick = onBuy,
-                        enabled = !isLoading
+                        enabled = !isLoading,
+                        shape = RoundedCornerShape(14.dp)
                     ) {
                         Text("Comprar")
                     }
@@ -542,4 +708,31 @@ fun CartDialog(
             }
         }
     )
+}
+
+@Composable
+fun EmptyState(
+    message: String,
+    buttonText: String,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = message,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyLarge
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(onClick = onClick) {
+            Text(buttonText)
+        }
+    }
 }
