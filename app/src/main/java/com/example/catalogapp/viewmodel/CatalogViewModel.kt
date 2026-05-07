@@ -112,7 +112,7 @@ $response
     }
 
     fun addProduct(product: Product) {
-        startSync("add", product)  // ✅ PASA EL PRODUCTO COMPLETO
+        startSync("add", product)
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
@@ -149,7 +149,7 @@ $response
     }
 
     fun updateProduct(product: Product) {
-        startSync("edit", product)  // ✅ PASA EL PRODUCTO COMPLETO
+        startSync("edit", product)
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
@@ -189,7 +189,7 @@ $response
 
     fun deleteProduct(productId: Int) {
         val product = products.find { it.id == productId }
-        startSync("delete", product)  // ✅ PASA EL PRODUCTO COMPLETO
+        startSync("delete", product)
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
@@ -308,6 +308,21 @@ $response
             } finally {
                 isLoading = false
             }
+        }
+    }
+
+    // ========== ✅ FUNCIÓN DE PRUEBA PARA NOTIFICACIÓN OBLIGATORIA ==========
+    fun testForegroundService() {
+        try {
+            val intent = Intent(getApplication(), SyncForegroundService::class.java)
+            intent.putExtra("operation", "test")
+            intent.putExtra("product_title", "Notificación de prueba")
+            intent.putExtra("product_id", 999)
+            getApplication<Application>().startService(intent)
+            successMessage = "🔔 Notificación de prueba iniciada"
+        } catch (e: Exception) {
+            errorMessage = "Error al iniciar servicio: ${e.message}"
+            e.printStackTrace()
         }
     }
 }

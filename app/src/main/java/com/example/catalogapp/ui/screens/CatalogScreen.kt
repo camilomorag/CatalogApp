@@ -64,33 +64,13 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.catalogapp.model.Product
 import kotlinx.coroutines.launch
-import android.Manifest
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import com.example.catalogapp.viewmodel.CatalogViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CatalogScreen(
-    viewModel: CatalogViewModel  // ✅ CORREGIDO: ya no crea el ViewModel, lo recibe
+    viewModel: CatalogViewModel
 ) {
-    // ✅ CÓDIGO PARA PEDIR PERMISO DE NOTIFICACIONES (Android 13+)
-    if (Build.VERSION.SDK_INT >= 33) {  // TIRAMISU = API 33
-
-        val notificationPermissionLauncher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.RequestPermission()
-        ) { isGranted ->
-            if (isGranted) {
-                // Permiso concedido
-            }
-        }
-
-        LaunchedEffect(Unit) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }
-
     val products = viewModel.products
     val cart = viewModel.cart
     val isLoading = viewModel.isLoading
@@ -209,7 +189,8 @@ fun CatalogScreen(
                         item {
                             HeaderSummary(
                                 totalProducts = products.size,
-                                totalCart = viewModel.cartCount()
+                                totalCart = viewModel.cartCount(),
+                                onTestNotification = { viewModel.testForegroundService() }
                             )
                         }
 
@@ -283,7 +264,8 @@ fun CatalogScreen(
 @Composable
 fun HeaderSummary(
     totalProducts: Int,
-    totalCart: Int
+    totalCart: Int,
+    onTestNotification: () -> Unit  // ✅ Parámetro para la prueba
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -316,6 +298,25 @@ fun HeaderSummary(
             ) {
                 StatChip("Productos", totalProducts.toString())
                 StatChip("Carrito", totalCart.toString())
+            }
+
+            // ✅ BOTÓN DE PRUEBA DE NOTIFICACIÓN OBLIGATORIA
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = onTestNotification,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("🔔 Probar Notificación Obligatoria")
             }
         }
     }
