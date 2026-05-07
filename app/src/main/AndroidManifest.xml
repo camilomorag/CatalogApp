@@ -2,11 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Permiso de INTERNET (ya lo tienes) -->
+    <!-- ========== PERMISOS DE INTERNET Y NOTIFICACIONES ========== -->
     <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- ✅ NUEVO: Permiso para notificaciones (API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- ========== PERMISOS PARA SERVICES OBLIGATORIOS (FOREGROUND) ========== -->
+    <!-- Permiso para ejecutar servicios en primer plano -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Permiso específico para sincronización de datos (requerido en Android 14+) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:allowBackup="true"
@@ -28,7 +33,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- ✅ NUEVO: Deep Link para abrir la app desde notificaciones -->
+            <!-- Deep Link para abrir la app desde notificaciones -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -36,5 +41,12 @@
                 <data android:scheme="catalogapp" android:host="catalog" />
             </intent-filter>
         </activity>
+
+        <!-- ========== DECLARACIÓN DEL SERVICIO OBLIGATORIO ========== -->
+        <service
+            android:name=".services.SyncForegroundService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
     </application>
 </manifest>

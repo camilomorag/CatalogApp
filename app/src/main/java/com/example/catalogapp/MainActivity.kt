@@ -10,7 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.example.catalogapp.ui.screens.CatalogScreen
 import com.example.catalogapp.ui.theme.CatalogAppTheme
-import com.example.catalogapp.ui.viewmodel.CatalogViewModel
+import com.example.catalogapp.viewmodel.CatalogViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

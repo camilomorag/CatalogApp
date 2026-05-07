@@ -63,12 +63,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.catalogapp.model.Product
-import com.example.catalogapp.ui.viewmodel.CatalogViewModel
 import kotlinx.coroutines.launch
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.example.catalogapp.viewmodel.CatalogViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
