@@ -61,17 +61,36 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.catalogapp.model.Product
 import com.example.catalogapp.ui.viewmodel.CatalogViewModel
 import kotlinx.coroutines.launch
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CatalogScreen(
-    viewModel: CatalogViewModel = viewModel()
+    viewModel: CatalogViewModel  // ✅ CORREGIDO: ya no crea el ViewModel, lo recibe
 ) {
+    // ✅ CÓDIGO PARA PEDIR PERMISO DE NOTIFICACIONES (Android 13+)
+    if (Build.VERSION.SDK_INT >= 33) {  // TIRAMISU = API 33
+
+        val notificationPermissionLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission()
+        ) { isGranted ->
+            if (isGranted) {
+                // Permiso concedido
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     val products = viewModel.products
     val cart = viewModel.cart
     val isLoading = viewModel.isLoading

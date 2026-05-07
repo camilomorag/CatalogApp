@@ -10,11 +10,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.example.catalogapp.ui.screens.CatalogScreen
 import com.example.catalogapp.ui.theme.CatalogAppTheme
+import com.example.catalogapp.ui.viewmodel.CatalogViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // ✅ Usar applicationContext en lugar de this
+        val viewModel = CatalogViewModel(application)
 
         setContent {
             CatalogAppTheme {
@@ -22,7 +26,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    CatalogScreen()
+                    CatalogScreen(viewModel = viewModel)
                 }
             }
         }
