@@ -14,6 +14,8 @@ import com.example.catalogapp.model.CartProduct
 import com.example.catalogapp.model.CartRequest
 import com.example.catalogapp.model.Product
 import com.example.catalogapp.services.SyncForegroundService
+// ✅ IMPORTANTE: Agrega este import para CartNotificationService
+import com.example.catalogapp.services.CartNotificationService
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -100,7 +102,7 @@ $response
         }
     }
 
-    // ========== FUNCIÓN START SYNC (CORREGIDA - recibe Product) ==========
+    // ========== FUNCIÓN START SYNC ==========
     fun startSync(operation: String, product: Product? = null) {
         val intent = Intent(getApplication(), SyncForegroundService::class.java)
         intent.putExtra("operation", operation)
@@ -227,9 +229,14 @@ $response
         }
     }
 
+    // ========== FUNCIÓN ADD TO CART MODIFICADA ==========
     fun addToCart(product: Product) {
         cart = cart + product
         successMessage = "${product.title} agregado al carrito"
+
+        // ✅ MOSTRAR NOTIFICACIÓN OBLIGATORIA INTERACTIVA
+        showObligatoryCartNotification(product)
+
         if (cart.size == 1 || cart.size % 3 == 0) {
             notificationHelper.showSuccessNotification(
                 "🛒 Producto agregado",
@@ -245,6 +252,8 @@ $response
             mutableCart.removeAt(index)
             cart = mutableCart
             successMessage = "${product.title} eliminado del carrito"
+            // ✅ Detener notificación si el producto fue eliminado
+            stopCartNotification()
         }
     }
 
@@ -252,6 +261,8 @@ $response
     fun cartTotal(): Double = cart.sumOf { it.price }
     fun clearCart() {
         cart = emptyList()
+        // ✅ Detener notificación al limpiar carrito
+        stopCartNotification()
     }
 
     fun sendCartToApi(userId: Int = 1) {
@@ -322,6 +333,37 @@ $response
             successMessage = "🔔 Notificación de prueba iniciada"
         } catch (e: Exception) {
             errorMessage = "Error al iniciar servicio: ${e.message}"
+            e.printStackTrace()
+        }
+    }
+
+    // ========== ✅ NUEVAS FUNCIONES PARA NOTIFICACIÓN OBLIGATORIA DEL CARRITO ==========
+
+    /**
+     * Muestra una notificación OBLIGATORIA (no descartable) cuando se agrega un producto
+     * El usuario debe elegir entre COMPRAR o DESCARTAR
+     */
+    fun showObligatoryCartNotification(product: Product) {
+        try {
+            val intent = Intent(getApplication(), CartNotificationService::class.java).apply {
+                putExtra(CartNotificationService.EXTRA_PRODUCT_ID, product.id)
+                putExtra(CartNotificationService.EXTRA_PRODUCT_TITLE, product.title)
+                putExtra(CartNotificationService.EXTRA_PRODUCT_PRICE, product.price)
+            }
+            getApplication<Application>().startService(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * Detiene la notificación obligatoria del carrito
+     */
+    private fun stopCartNotification() {
+        try {
+            val intent = Intent(getApplication(), CartNotificationService::class.java)
+            getApplication<Application>().stopService(intent)
+        } catch (e: Exception) {
             e.printStackTrace()
         }
     }
